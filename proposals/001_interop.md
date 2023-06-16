@@ -1,4 +1,4 @@
-# Interoperability and discoverability protocol
+# Docmaps Server API Protocol
 
 ## Abstract
 
@@ -84,16 +84,41 @@ TODO: should this be JSON-LD?
 ```json
 {
   "api_url": "https://example.com/ex/docmaps/v1/",
-  "api_version": "1.0.0"
+  "api_version": "1.0.0",
+  "ephemeral_document_expiry": {
+    "max_seconds": 60,
+    "max_retrievals": 1
+  },
+  "peers": [
+    {
+      "api_url": "https://otherserver.com/docmaps/v1"
+    }
+  ]
 }
 ```
 
 where
 
-`**api_url**` : the URL with path prefix to this server. it SHOULD end with a slash.
-it MUST conform to the endpoint URL constraints (see above).
+`**api_url**` : the URL with path prefix to this server. It SHOULD end with a slash.
+It MUST conform to the endpoint URL constraints (see above).
 
-`**api_version**` : MUST be exactly the version of  this document (`"1.0.0"`).
+`**api_version**` : MUST be exactly the version of this document (`"1.0.0"`).
+
+`**ephemeral_document_expiry**` : MUST be an object that informs the user about conditions in which
+ephemeral documents stop becoming available. If this server has conditions in which it expires these
+documents, it MUST specify those here. If no guarantees are available and documents may expire immediately,
+it SHOULD specify all expiry indicators as `0`. This property is applicable to search results, including Docmaps
+for a given DOI, which are implicitly ephemeral due to the possibility that 
+
+`**ephemeral_document_expiry.max_seconds**` : Optional. Clients should expect documents to expire after this duration in seconds.
+
+`**ephemeral_document_expiry.max_retrievals**` : Optional. Clients should expect documents to expire after this number of retrievals.
+
+`**peers**` : Optional field to refer clients to other Docmaps servers that may be of interest.
+If present, MUST be an array of objects, and `peers[].api_url` MUST be a URL with path prefix
+that directs to a server that conforms to this Protocol.
+Clients MUST decide on their own whether to trust these other servers. Future updates to this
+protocol will include how to specify trust information as part of this annotation.
 
 ### Querying a known object IRI
 
@@ -218,10 +243,6 @@ TODO: comment on future publisher integrity strategies.
 These endpoints are REQUIRED for all standard Docmaps servers. They enable consumers to discover what docmaps or objects
 can be retrieved from this server. They return information about further quueries that can be performed to retrieve docmaps.
 
-#### GET /ldgraph/
-
-TODO: does this endpoint make any sense with the combination of SEARCH?
-
 #### POST /search
 
 The search query MUST be accepted in the request body as type `application/json`. Although servers are invited to
@@ -230,24 +251,41 @@ fields in the search:
 
 ```json
 {
-  "query": {
-  }
+  "query_terms": [
+    {
+      "match": "https://data-hub-api.elifesciences.org/enhanced-preprints/docmaps/v1/index",
+      "paths": ["publisher.id"]
+    },
+    {
+      "match": "docmap",
+      "paths": ["type"]
+    }
+  ]
 }
 ```
 
-MUST return a linked-data (JSON-LD) graph, because this endpoint is not strictly typed.
+where
+
+PATH | DETAILS
+| - | - |
+| `query_terms` | MUST be an array of object. |
+| `query_terms[].match` | MUST be a full IRI or a JSON-LD shortcut present in the Docmaps JSON-LD context. |
+
+TODO: specifying handling of large sets of responses (pagination)?
+
+**Response** MUST return a linked-data (JSON-LD) graph, because this endpoint is not strictly typed.
 For use-cases where JSON-LD is of limited applicability, the graph may be disjoint (i.e.,
 an array of objects whose contents are unrelated to each other.)
 
 ```json
 {
   "@context": "https://w3id.org/docmaps/context.jsonld",
-    "@graph": [
-      {
-        "type": "docmap",
-        "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2"
-      }
-    ]
+  "@graph": [
+    {
+      "type": "docmap",
+      "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2"
+    }
+  ]
 }
 ```
 
@@ -257,7 +295,7 @@ PATH | DETAILS
 | - | - |
 | `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
 | `@graph` |  MUST be an array of objects.  |
-| `@graph[]` |  Each entity MAY be an entity that can be independently decoded into a valid object in Docmaps vocabulary. However, clients SHOULD expect to retrieve the majority of entity details via followup requests. |
+| `@graph[]` |  Each entity MAY be an entity that can be independently decoded into a valid object in Docmaps vocabulary. However, clients MAY be required to retrieve the majority of entity details via followup requests. |
 | `@graph[].type` |  SHOULD be an entity type or type IRI allowed in the docmaps vocabulary. Consumers will use this key to identify useable elements in the response body. |
 | `@graph[].id` | MUST be an IRI. SHOULD be an IRI to an object that can be served by this API. |
 
@@ -270,16 +308,49 @@ are not required, but if they exist, servers MUST implement them according to th
 TODO - what do i want to support here? Current utilization actually just does not work the way i recommend.
 
 - since these are ephemeral endpoints, the ID for the docmap should never be the same as the query
-- since these are ephemeral endpoints, the ID for the docmap should never be the same as the query
 
-#### GET /docmap_for/doi?subj={doi}
-#### GET /docmap_for/iri?subj={iri}
+#### GET /docmap_for/doi?subject={doi}
+#### GET /docmap_for/iri?subject={iri}
 
 ### Batch queries for Indexing
 
 These endpoints are OPTIONAL for Docmaps servers that wish to support being indexed. They allow a client to synchronize
 its application state with the latest state of the server's dataset. This use-case has stricter requirements for data
 integrity on the server's internal state management than the other use-cases.
+
+#### GET /ldgraph
+
+This endpoint exposes a sync-forward API for linked-data consumers to ingest wholesale the contents
+of an RDF graph that stores docmaps. This is the preferred method of indexing.
+
+**Request** query terms 
+
+TODO fill out request body
+
+- from: a sync head. must be number, can be timestamp or preferably a serial. if omitted, start from earliest known.
+Conventionally, element(s) that match `from` are included.
+
+**Response** MUST respond with an LD-graph  of objects that may be disjoint. These objects MUST all have
+IRIs in their `ID` field.
+
+TODO fill out body
+
+- continue_from: what to include as `from` in the next request. Conventionally,  elements that match `from` are
+not included.
+
+#### GET /changes
+
+This endpoint exposes a sync-forward API for linked or unlinked data that allows a client to confidently
+model their  own datasets  based on  up-to-date information available from this server in a meterable
+way.
+
+If this endpoint exists, it MUST conform to this specification.
+
+TODO: does this endpoint make any sense with the combination of /ldgraph? It would have to be "every
+docmap we are capable of generating", or similar, but with the "what is a docmap?" questions, that
+is not very well defined.
+
+TODO: returns a paginated set of docmaps including URLs that the client can use to sync-forward.
 
 ## Potential Impact
 
