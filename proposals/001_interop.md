@@ -6,6 +6,12 @@ This proposal is for a standard API contract for servers which offer Docmaps to 
 defining the endpoints that should be implemented for identifying the server, serving docmaps, searching for docmaps, including
 rules such as what endpoint results must be stable/cacheable and which may be dynamic.
 
+This proposes a server specification that conforms to W3C Linked Data Platform recommendations, because Docmaps data are
+natively considered to be Linked Data. Although an implementer of this protocol may not offer full linked data support,
+such as allowing `content-type: text/turtle`, and may not represent the data as a graph or triplestore in their persistent
+state solution, they are expected to implement this API at a minimum according to the usages of JSON-LD as described herein,
+in order to enable consumers of this data to seamlessly treat it as LD.
+
 ## Motivation
 
 At this stage in the development of the Docmaps ecosystem, there is significant demand for Docmaps data for preprints but
@@ -49,7 +55,6 @@ This proposal's scope does NOT include rules for:
 This proposal describes a version 1.x. Versioning of this API protocol follows the semver
 "semantic versioning" scheme.
 
-TODO: decide whether this is harmful to integrity efforts:
 All endpoints MAY include in their responses a key
 `"protocol_version": "1.0"` to indicate their compatibility. No other 
 
@@ -71,6 +76,17 @@ changes will result in a path change to `*/v2` and above.
 
 All endpoints that return body contents MUST respond with JSON. Where indicated, they MAY respond with JSON-LD.
 
+This proposes a server specification that conforms to [W3C Linked Data Platform (LDP) recommendations](https://www.w3.org/TR/2015/REC-ldp-20150226/), because Docmaps data are
+natively considered to be Linked Data. Although an implementer of this protocol may not offer full linked data support,
+such as allowing `content-type: text/turtle`, and may not represent the data as a graph or triplestore in their persistent
+state solution, they are expected to implement this API at a minimum according to the usages of JSON-LD as described herein,
+in order to enable consumers of this data to seamlessly treat it as LD.
+
+Where this recommendation may disagree or be incompatible with the LDP recommendations, implementers are advised to prefer this
+document, and open an issue on GitHub to discuss bringing this specification into compliance with LDP.
+
+Any resource path MAY support pagination. If pagination is present, it MUST conform to the [LDP Paging recommendation](https://www.w3.org/TR/ldp-paging/).
+
 ### Identifying the server
 
 These endpoints are REQUIRED for all standard Docmaps servers. They enable consumers to make decisions about the identity
@@ -79,7 +95,6 @@ and trustworthiness of the server, and manage changes that may occur in the iden
 #### GET /info
 This endpoint provides information about the server to aid with future utilization:
 
-TODO: should this be JSON-LD?
 
 ```json
 {
@@ -270,6 +285,7 @@ PATH | DETAILS
 | - | - |
 | `query_terms` | MUST be an array of object. |
 | `query_terms[].match` | MUST be a full IRI or a JSON-LD shortcut present in the Docmaps JSON-LD context. |
+| `query_terms[].paths` | MUST be an array of JSON paths, IRIs or JSON-LD shortcuts that the match term matches to. |
 
 TODO: specifying handling of large sets of responses (pagination)?
 
@@ -318,25 +334,79 @@ These endpoints are OPTIONAL for Docmaps servers that wish to support being inde
 its application state with the latest state of the server's dataset. This use-case has stricter requirements for data
 integrity on the server's internal state management than the other use-cases.
 
-#### GET /ldgraph
+Though other
+
+#### GET /synchronization*?from=9999&limit=9999&session=ff000000*
 
 This endpoint exposes a sync-forward API for linked-data consumers to ingest wholesale the contents
-of an RDF graph that stores docmaps. This is the preferred method of indexing.
+of an RDF graph that stores docmaps. This is the preferred method of indexing. Note that while the
+specification of this endpoint allows an implementer to respond purely with lists of Docmaps, it is
+preferred to respond with persistent objects only, and allow the indexer to construct docmaps dynamically.
 
-**Request** query terms 
+This endpoint is designed to allow servers to decide what constitutes a sync-head. For event-backed datasets, it may be
+a serial ID generated for each sequential event. For datasets that support sync via point-in-time snapshots, the sync
+head may be per user.
 
-TODO fill out request body
+This endpoint MUST handle parameters supplied as URL Query Parameters, and SHOULD NOT support accepting these
+parameters as fields in the request body.
 
-- from: a sync head. must be number, can be timestamp or preferably a serial. if omitted, start from earliest known.
-Conventionally, element(s) that match `from` are included.
+- from: a sync head. if present, must be number, can be timestamp or preferably a serial. if omitted, start from earliest known.
+Conventionally, element(s) that match `from` are included. Timestamp implementations of `from` may have unspecified behavior
+and are not recommended.
+- limit: a specified maximum number of elements. Because Docmaps data are natively graph based, the semantics of this
+limit are left to implementers and SHOULD NOT be relied upon by clients to produce predictable behavior. A given server
+MAY encourage consumers of the API to use this parameter to intentfully specify their capacity for pagination. A client
+MUST NOT assume that all servers will handle this parameter in the same way.
+- session: OPTIONAL, any string identifier that the server may require for purposes of tracking session-based syncs. The server
+may decide whether this field is required and any further substructure expected within the string that their session cardinality
+may depend on. Note that session identification relates  to client identification  and therefore there are security considerations.
+For example, a server may issue a session token on request for a sync with no `from` specified, as starting a new sync
+session. This session token can be used to disrupt the sync session and so is considered a secret, even though the impact of
+impersonation may not be severe.
 
 **Response** MUST respond with an LD-graph  of objects that may be disjoint. These objects MUST all have
 IRIs in their `ID` field.
 
-TODO fill out body
+Note that this endpoint is asssumed to be dependent on pagination, and MUST conform to LDP Paging (see above).
 
-- continue_from: what to include as `from` in the next request. Conventionally,  elements that match `from` are
-not included.
+The `next` `Link` response header is REQUIRED for this endpoint. If that link refers to a next page which does not yet exist,
+because the synchronizing client has caught up, it MUST serve `HTTP 202 Accepted` response. Clients are expected to resubmit
+the same query later according to a reasonable back-off scheme.
+
+```http
+GET https://example.com/docmaps/v1/synchronization?from=9999&limit=9999&session=ff000000
+
+HTTP/1.1 200 OK
+Content-Type:  application/ld+json
+Link: <https://example.com/docmaps/v1/synchronization?from=19998&limit=9999&session=ff000000>; rel="next"
+```
+
+```json
+{
+   "@context": "https://w3id.org/docmaps/context.jsonld",
+   "@graph": [
+      {
+        "type": "docmap",
+        "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2"
+      }
+   ]
+}
+```
+
+where
+
+| Field | Value |
+| -------- | -------- |
+| `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
+| `@graph` | MUST be a json-ld graph. |
+
+By recommendation of the authors, this endpoint SHOULD NOT respond with elements of `"type": "docmap"`, though this is
+allowed. It is generally recommended to respond with persistent objects like Actions, Assertions, and Manifestations.
+
+A client MUST NOT assume that the sync is complete because the server did not obey the `limit` parameter. The only
+semantics for a complete synchronization are a `202 Accepted` response, indicating that the sync is up-to-date and
+may continue in the future, or a `204 No Content` or `410 Gone` response, indicating that the sync or session is no longer
+useable and a new one should be started without the `from` parameter.
 
 #### GET /changes
 
