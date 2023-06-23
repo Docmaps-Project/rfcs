@@ -203,7 +203,7 @@ docmap objects, but consumers should not assume these IDs can be guessed. See "A
 
 where
 
-PATH | DETAILS
+| PATH | DETAILS |
 | - | - |
 | `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
 | `id` |  The ID of the docmap. MUST be an IRI and MUST be exactly the URL queried to retrieve this docmap.  |
