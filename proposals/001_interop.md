@@ -135,11 +135,14 @@ that directs to a server that conforms to this Protocol.
 Clients MUST decide on their own whether to trust these other servers. Future updates to this
 protocol will include how to specify trust information as part of this annotation.
 
+#### {\*} /trust/\*
+
+Reserved for future use. Servers MUST NOT implement any behavior under these paths except to return 404.
+
 ### Querying a known object IRI
 
 These endpoints are REQUIRED for all standard Docmaps servers. They enable consumers to retrieve objects in full which
 the server can authoritatively or nonauthoritatively attest.
-
 
 #### GET /docmap/{ID}
 
@@ -217,8 +220,6 @@ PATH | DETAILS
 | `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
 | `id` |  The ID of the docmap. MUST be an IRI and MUST be exactly the URL queried to retrieve this docmap.  |
 
-TODO: comment on future publisher integrity strategies.
-
 #### GET /publisher/{ID}
 
 Returns information about Docmaps publishers. This endpoint is REQUIRED for servers which
@@ -251,7 +252,14 @@ PATH | DETAILS
 | `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
 | `id` |  The ID of the publisher. MUST be an IRI and MUST be a URL which when queried responds with this publisher exactly. |
 
-TODO: comment on future publisher integrity strategies.
+Publishers are always named nodes (nodes with IRIs for named nodes (nodes with IRIs) in the Docmaps specification. Therefore
+they are always considered persistent. Any signatory information is separate from  their RDF bodies (the data in this  endpoint's
+response), so those bodies can safely  change. However, if the IRI of a publisher changes, clients will need to handle the migration
+by their own logic until  the core Docmaps protocol is improved ([see Github  Issue here](https://github.com/Docmaps-Project/docmaps/issues/69)).
+That  improvement is out of the scope of this RFC.
+
+The authors of this specification anticipate the relationship between a server and specific Publishers whose signing identities
+are owned by the server may be expressed in extensions to this endpoint. See "Security" below.
 
 ### Searching for docmaps based on content matter
 
@@ -318,21 +326,24 @@ PATH | DETAILS
 These endpoints enable a consumer with knowledge of a specific document to request further data about
 that document in the form of a docmap from this server without first performing a search. These endpoints
 are not required, but if they exist, servers MUST implement them according to the protocol specification.
+They are included in the specification to reduce adoption overhead for servers that currently have similar
+one-shot API endpoints that their clients wish to continue using.
 
-TODO - what do i want to support here? Current utilization actually just does not work the way i recommend.
-
-- since these are ephemeral endpoints, the ID for the docmap should never be the same as the query
+Critically, this endpoint differs from the `/docmap/{ID}`endpoint because with this endpoint, a client MUST
+NOT expect that  the body's `id` contains an IRI matching this endpoint. For this reason, this endpoint
+should be considered non-canonical. Note that the subject DOI is provided as a query parameter rather than a
+path parameter.
 
 #### GET /docmap_for/doi?subject={doi}
 #### GET /docmap_for/iri?subject={iri}
+
+**Response** matching response body structure of `/docmap/{ID}
 
 ### Batch queries for Indexing
 
 These endpoints are OPTIONAL for Docmaps servers that wish to support being indexed. They allow a client to synchronize
 its application state with the latest state of the server's dataset. This use-case has stricter requirements for data
 integrity on the server's internal state management than the other use-cases.
-
-Though other
 
 #### GET /synchronization*?from=9999&limit=9999&session=ff000000*
 
@@ -453,11 +464,13 @@ This thinking is what motivated these choices in the proposal you have been read
 
 - `peers` in `/info`: As currently designed, this is purely informational, but this struct can in future include
 information about the trustworthiness of those peers.
+- `/trust/\*` endpoints are reserved.
+- `/publisher/{ID}` endpoint explicitly does not account for trust information,  and this RFC includes notes about
+future additional endpoints that may enable trust information such as public keys under the reserved path `/trust`.
 
 ## References
 
-[List any relevant sources or documents that were used in developing this RFC.]
-
-- TODO: link to extant Sciety implementations
-- TODO: link to extant embo implementations
+- Sciety  server: https://sciety.org/docmaps/v1
+- Sciety  source: https://github.com/sciety/api-prototype
+- EMBO source: https://github.com/source-data/sd-graph
 - TODO: link to extant biorxiv implementations
