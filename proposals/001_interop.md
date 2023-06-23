@@ -140,13 +140,13 @@ protocol will include how to specify trust information as part of this annotatio
 These endpoints are REQUIRED for all standard Docmaps servers. They enable consumers to retrieve objects in full which
 the server can authoritatively or nonauthoritatively attest.
 
-TODO: comment on ephemerality of docmap stuff.
 
 #### GET /docmap/{ID}
 
 MUST return a JSON body that is a decodable Docmap. MAY include a `@context` key
 for users to interpret as a JSON-LD object. MUST NOT return a top-level `@graph`
-key.
+key. Note that this endpoint may be implemented correctly with any naming scheme for
+docmap objects, but consumers should not assume these IDs can be guessed. See "Alternatives" below.
 
 ```json
 {
@@ -287,8 +287,6 @@ PATH | DETAILS
 | `query_terms[].match` | MUST be a full IRI or a JSON-LD shortcut present in the Docmaps JSON-LD context. |
 | `query_terms[].paths` | MUST be an array of JSON paths, IRIs or JSON-LD shortcuts that the match term matches to. |
 
-TODO: specifying handling of large sets of responses (pagination)?
-
 **Response** MUST return a linked-data (JSON-LD) graph, because this endpoint is not strictly typed.
 For use-cases where JSON-LD is of limited applicability, the graph may be disjoint (i.e.,
 an array of objects whose contents are unrelated to each other.)
@@ -408,20 +406,6 @@ semantics for a complete synchronization are a `202 Accepted` response, indicati
 may continue in the future, or a `204 No Content` or `410 Gone` response, indicating that the sync or session is no longer
 useable and a new one should be started without the `from` parameter.
 
-#### GET /changes
-
-This endpoint exposes a sync-forward API for linked or unlinked data that allows a client to confidently
-model their  own datasets  based on  up-to-date information available from this server in a meterable
-way.
-
-If this endpoint exists, it MUST conform to this specification.
-
-TODO: does this endpoint make any sense with the combination of /ldgraph? It would have to be "every
-docmap we are capable of generating", or similar, but with the "what is a docmap?" questions, that
-is not very well defined.
-
-TODO: returns a paginated set of docmaps including URLs that the client can use to sync-forward.
-
 ## Potential Impact
 
 Aside from aforementioned benefits to having a shared protocol, there are risks and challenges to consider.
@@ -431,18 +415,44 @@ or large-audience stakeholders are unwilling to cooperate, competing standards a
 there is risk that we commit as a group to solutions that scale poorly, are hard to understand, or present security risks.
 See Security and Privacy Considerations below.
 
-**TODO:** reassess this section in light of the proposed contract.
-
 ## Alternatives Considered
 
-- comment on making docmaps permanent objects
+An alternative is considered where the API design of sync-forward and search APIs would be designed around DOIs
+and Docmap IDs explicitly. In this alternative, a single Docmap is presumed likely to exist for a single DOI,
+and the Docmap for that DOI may exist in several places and updated from time to time by the attester. This
+useage is allowed in the Docmaps core specification, which is unopinionated about the handling of docmaps changing
+over time.
+
+However, given that a document or preprint may be argued for by various parties for various different reasons, it
+is more appropriate to say that we have "a docmap for preprint P" rather than "the docmap for preprint P". It is
+realistic to assume that a consumer of a docmap may intend to combine contents from two docmaps to make a new argument
+for the document. Therefore for integrity and addressability reasons, the attester of the various integral pieces
+of a docmap must already manage the pieces in their own right. Following this, we recommend in this document that
+servers de-emphasize the ingestion of their docmaps for persistence purposes and serve the underlying elements in /synchronize.
+
+Another considered solution to this same problem is to normalize the use of Docmaps that make direct reference to other
+Docmaps rather than deconstructing them. In this flow, computation performed to combine two docmaps would treat each
+sub-docmap as an Action in a Step in a super-Docmap. The Assertions present in a sub-Docmap would be exposed as assertions
+in the containing Step. We do not pursue this solution because it confines computation performed across docmaps to Assertions
+and not Steps -- if docmap D contains a step S and docmap E contains a step T, and S and T together are enough to warrant an
+assertion but each alone is not, then a consumer of a docmap must handle a special case of recursion for all docmaps-as-steps.
 
 ## Security and Privacy Considerations
 
-[Identify any security or privacy concerns related to the proposed changes and describe how they will be addressed.]
+This proposal is primarily intended to describe Docmaps servers which may have secret signing keys but which do not
+intend to keep any core Docmaps data secret. Therefore it is recommended to follow any organizational or regulatory
+security requirements where they disagree with this proposal.
 
-**TODO:** reassess this section in light of the proposed contract.
-**TODO:** assess forwards comaptibility with planned object integrity checking schemes.
+Systematically, the Docmaps ecosystem deals with the trustworthiness of scientific publications and other documents.
+There is a security and integrity capability in the medium term that has not yet been explored, wherein a Public Key
+Infrastructure (PKI) is incorporated with a Docmaps ecosystem to enable trustworthy computation to be performed on
+Docmaps. This will be elaborated in future proposals, but it is of concern that this proposal is designed with the
+future support of this feature set in mind.
+
+This thinking is what motivated these choices in the proposal you have been reading:
+
+- `peers` in `/info`: As currently designed, this is purely informational, but this struct can in future include
+information about the trustworthiness of those peers.
 
 ## References
 
