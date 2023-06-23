@@ -114,26 +114,14 @@ This endpoint provides information about the server to aid with future utilizati
 
 where
 
-`**api_url**` : the URL with path prefix to this server. It SHOULD end with a slash.
-It MUST conform to the endpoint URL constraints (see above).
-
-`**api_version**` : MUST be exactly the version of this document (`"1.0.0"`).
-
-`**ephemeral_document_expiry**` : MUST be an object that informs the user about conditions in which
-ephemeral documents stop becoming available. If this server has conditions in which it expires these
-documents, it MUST specify those here. If no guarantees are available and documents may expire immediately,
-it SHOULD specify all expiry indicators as `0`. This property is applicable to search results, including Docmaps
-for a given DOI, which are implicitly ephemeral due to the possibility that 
-
-`**ephemeral_document_expiry.max_seconds**` : Optional. Clients should expect documents to expire after this duration in seconds.
-
-`**ephemeral_document_expiry.max_retrievals**` : Optional. Clients should expect documents to expire after this number of retrievals.
-
-`**peers**` : Optional field to refer clients to other Docmaps servers that may be of interest.
-If present, MUST be an array of objects, and `peers[].api_url` MUST be a URL with path prefix
-that directs to a server that conforms to this Protocol.
-Clients MUST decide on their own whether to trust these other servers. Future updates to this
-protocol will include how to specify trust information as part of this annotation.
+| PATH | DETAILS |
+| --- | --- |
+| `api_url` | The URL with path prefix to this server. It SHOULD end with a slash. It MUST conform to the endpoint URL constraints (see above). |
+| `api_version` | MUST be exactly the version of this document (`"1.0.0"`). |
+| `ephemeral_document_expiry` | MUST be an object that informs the user about conditions in which ephemeral documents stop becoming available. If this server has conditions in which it expires these documents, it MUST specify those here. If no guarantees are available and documents may expire immediately, it SHOULD specify all expiry indicators as `0`. This property is applicable to search results, including Docmaps for a given DOI, which are implicitly ephemeral. |
+| `ephemeral_document_expiry.max_seconds` : Optional. Clients should expect documents to expire after this duration in seconds. |
+| `ephemeral_document_expiry.max_retrievals` : Optional. Clients should expect documents to expire after this number of retrievals. |
+| `peers` | Optional field to refer clients to other Docmaps servers that may be of interest. If present, MUST be an array of objects, and `peers[].api_url` MUST be a URL with path prefix that directs to a server that conforms to this Protocol. Clients MUST decide on their own whether to trust these other servers. Future updates to this protocol will include how to specify trust information as part of this annotation. |
 
 #### {\*} /trust/\*
 
