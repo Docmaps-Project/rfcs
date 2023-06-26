@@ -461,4 +461,4 @@ future additional endpoints that may enable trust information such as public key
 - Sciety  server: https://sciety.org/docmaps/v1
 - Sciety  source: https://github.com/sciety/api-prototype
 - EMBO source: https://github.com/source-data/sd-graph
-- TODO: link to extant biorxiv implementations
+- bioRxiv server: https://connect.biorxiv.org/relate/docmap/all , single example: https://connect.biorxiv.org/relate/docmap/2021.08.25.21262636/Rapid%20Reviews%20COVID-19
