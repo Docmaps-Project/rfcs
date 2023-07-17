@@ -414,6 +414,14 @@ or large-audience stakeholders are unwilling to cooperate, competing standards a
 there is risk that we commit as a group to solutions that scale poorly, are hard to understand, or present security risks.
 See Security and Privacy Considerations below.
 
+Note that because this scheme intentionally does not presume that Docmaps have stable IDs, it is up to consumers to
+manage relationships between historically retrieved Docmaps and stable IDs such as document DOIs. For example, if a
+client requests a docmap for DOI `10.1234/abc`, and gets a docmap with ID like `host:port/v1/docmap/abc123`, the client
+MUST NOT assume that such a Docmap will be retrievable in the future, and MUST NOT rely on the server to inform the
+client if the docmap has changed in the past or ends in the future. **Our recommendation** to clients who wish to
+support this use-case is to store a table of the `| document id | sha(docmap_content) |` which records a last known
+state of the docmap.
+
 ## Alternatives Considered
 
 An alternative is considered where the API design of sync-forward and search APIs would be designed around DOIs
@@ -426,8 +434,9 @@ However, given that a document or preprint may be argued for by various parties 
 is more appropriate to say that we have "a docmap for preprint P" rather than "the docmap for preprint P". It is
 realistic to assume that a consumer of a docmap may intend to combine contents from two docmaps to make a new argument
 for the document. Therefore for integrity and addressability reasons, the attester of the various integral pieces
-of a docmap must already manage the pieces in their own right. Following this, we recommend in this document that
-servers de-emphasize the ingestion of their docmaps for persistence purposes and serve the underlying elements in /synchronize.
+of a docmap must already manage the pieces in their own right independently from their inclusion in an argument.
+Our recommendation follows from this, that servers de-emphasize the ingestion of their docmaps for persistence
+purposes and serve the underlying elements in /synchronize.
 
 Another considered solution to this same problem is to normalize the use of Docmaps that make direct reference to other
 Docmaps rather than deconstructing them. In this flow, computation performed to combine two docmaps would treat each
