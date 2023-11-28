@@ -10,7 +10,7 @@
 
 ### Checklist
 
-- [ ] I have followed the [Docmaps Project code of conduct](https://github.com/Docmaps-Project/docmaps/blob/main/CODE_OF_CONDUCT.md).
+- [ ] I have followed the [DocMaps Project code of conduct](https://github.com/Docmaps-Project/docmaps/blob/main/CODE_OF_CONDUCT.md).
 - [ ] I have filled out relevant sections of the proposal document and included a link to its rendered form in this PR.
 
 ### Additional Information
