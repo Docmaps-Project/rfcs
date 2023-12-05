@@ -127,12 +127,21 @@ where
 
 Reserved for future use. Servers MUST NOT implement any behavior under these paths except to return 404.
 
-### Querying a known object IRI
+### Querying a known named-node IRI
 
-These endpoints are REQUIRED for all standard DocMaps servers. They enable consumers to retrieve objects in full which
+These endpoints are REQUIRED for all standard DocMaps servers. They enable consumers to retrieve nodes in full which
 the server can authoritatively or nonauthoritatively attest.
 
-#### GET /docmap/{ID}
+Note that "objects" for the purpose of this document may include blank nodes, but we use the path
+prefix `/nn/` to be clear and consistent that these endpoints only return named nodes, and indeed
+it is implied by returning any object from these endpoints that they will include the requested
+URL as the `id` of any returned body.
+
+As of this version of the Docmaps API server specification, only the `/nn/docmap/{ID}` and
+`/nn/publisher/{ID}` routes are REQUIRED, however any other typed path is permitted, and 
+specifically recommended are `/nn/thing` and `/nn/action`.
+
+#### GET /nn/docmap/{ID}
 
 MUST return a JSON body that is a decodable docmap. MAY include a `@context` key
 for users to interpret as a JSON-LD object. MUST NOT return a top-level `@graph`
@@ -142,11 +151,11 @@ docmap objects, but consumers should not assume these IDs can be guessed. See "A
 ```json
 {
    "@context": "https://w3id.org/docmaps/context.jsonld",
-   "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2",
+   "id": "https://example.com/ex/docmaps/v1/nn/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2",
    "type": "docmap",
    "publisher": {
      "name": "John Doe",
-     "id": "https://example.com/ex/docmaps/v1/publisher/example_press"
+     "id": "https://example.com/ex/docmaps/v1/nn/publisher/example_press"
    },
    "created": "2020-01-01",
    "steps": {
@@ -208,10 +217,10 @@ where
 | `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
 | `id` |  The ID of the docmap. MUST be an IRI and MUST be exactly the URL queried to retrieve this docmap.  |
 
-#### GET /publisher/{ID}
+#### GET /nn/publisher/{ID}
 
 Returns information about DocMaps publishers. This endpoint is REQUIRED for servers which
-claim to be authoritative publishers of any DocMaps, i.e., if `GET /docmap/{id}` returns any
+claim to be authoritative publishers of any DocMaps, i.e., if `GET /nn/docmap/{id}` returns any
 `publisher.id` which has as a prefix the `api_url` of this server. This endpoint MUST return
 valid results for each of those IDs.
 
@@ -223,7 +232,7 @@ If present, MUST return a JSON body that is a decodable docmap Publisher. MAY in
  {
    "@context": "https://w3id.org/docmaps/context.jsonld",
    "name": "John Doe",
-   "id": "https://example.com/ex/docmaps/v1/publisher/example_press",
+   "id": "https://example.com/ex/docmaps/v1/nn/publisher/example_press",
    "homepage": "https://example.com/",
    "logo": "https://example.com/logo.img",
    "account": {
@@ -248,6 +257,13 @@ That  improvement is out of the scope of this RFC.
 
 The authors of this specification anticipate the relationship between a server and specific Publishers whose signing identities
 are owned by the server may be expressed in extensions to this endpoint. See "Security" below.
+
+#### GET /nn/{\*}/{ID}
+
+Any path matching `/nn/\*/{ID}` is allowed and recommended to enable ease-of-use with search and synchronization.
+Although both `/search` and `/synchronization` allow response graphs that are ultimately lists of docmaps, it is
+recommended that they respond with graphs of all the constituent named nodes, which SHOULD NOT include docmaps.
+The results of such a query SHOULD have an `id` field matching these endpoints.
 
 ### Searching for docmaps based on content matter
 
@@ -289,13 +305,33 @@ an array of objects whose contents are unrelated to each other.)
 
 ```json
 {
-  "@context": "https://w3id.org/docmaps/context.jsonld",
-  "@graph": [
-    {
-      "type": "docmap",
-      "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2"
-    }
-  ]
+   "@context": "https://w3id.org/docmaps/context.jsonld",
+   "@graph": [
+       {
+         "id": "https://example.com/docmaps/v1/nn/action/creates-abcdef",
+         "outputs": [{
+             "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+         }],
+         "participants": [{
+           "actor": {
+             "type": "person",
+             "name": "John Doe"
+           },
+           "role": "author"
+         }],
+         "id": "123456"
+       },
+       {
+         "published": "2020-01-01",
+         "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+         "doi": "10.12345/abcdef",
+         "type": "Article",
+         "content": [{
+           "type": "text",
+           "text": "This is an example of a thing"
+         }]
+       }
+   ]
 }
 ```
 
@@ -317,7 +353,7 @@ are not required, but if they exist, servers MUST implement them according to th
 They are included in the specification to reduce adoption overhead for servers that currently have similar
 one-shot API endpoints that their clients wish to continue using.
 
-Critically, this endpoint differs from the `/docmap/{ID}`endpoint because with this endpoint, a client MUST
+Critically, this endpoint differs from the `/nn/docmap/{ID}`endpoint because with this endpoint, a client MUST
 NOT expect that  the body's `id` contains an IRI matching this endpoint. For this reason, this endpoint
 should be considered non-canonical. Note that the subject DOI is provided as a query parameter rather than a
 path parameter.
@@ -325,7 +361,7 @@ path parameter.
 #### GET /docmap_for/doi?subject={doi}
 #### GET /docmap_for/iri?subject={iri}
 
-**Response** matching response body structure of `/docmap/{ID}
+**Response** matching response body structure of `/nn/docmap/{ID}
 
 ### Batch queries for Indexing
 
@@ -382,10 +418,29 @@ Link: <https://example.com/docmaps/v1/synchronization?from=19998&limit=9999&sess
 {
    "@context": "https://w3id.org/docmaps/context.jsonld",
    "@graph": [
-      {
-        "type": "docmap",
-        "id": "https://example.com/ex/docmaps/v1/docmap/deadbeef-f1e7-4b2c-a6f5-d8c2f9f9a2e2"
-      }
+       {
+         "inputs": [{
+             "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+         }],
+         "participants": [{
+           "actor": {
+             "type": "person",
+             "name": "John Doe"
+           },
+           "role": "author"
+         }],
+         "id": "https://example.com/docmaps/v1/nn/action/deadbeef",
+       },
+       {
+         "published": "2020-01-01",
+         "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+         "doi": "10.12345/abcdef",
+         "type": "Article",
+         "content": [{
+           "type": "text",
+           "text": "This is an example of a thing"
+         }]
+       }
    ]
 }
 ```
@@ -462,7 +517,7 @@ This thinking is what motivated these choices in the proposal you have been read
 - `peers` in `/info`: As currently designed, this is purely informational, but this struct can in future include
 information about the trustworthiness of those peers.
 - `/trust/\*` endpoints are reserved.
-- `/publisher/{ID}` endpoint explicitly does not account for trust information,  and this RFC includes notes about
+- `/nn/publisher/{ID}` endpoint explicitly does not account for trust information,  and this RFC includes notes about
 future additional endpoints that may enable trust information such as public keys under the reserved path `/trust`.
 
 ## References
