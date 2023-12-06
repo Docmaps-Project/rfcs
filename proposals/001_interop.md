@@ -369,7 +369,7 @@ These endpoints are OPTIONAL for DocMaps servers that wish to support being inde
 its application state with the latest state of the server's dataset. This use-case has stricter requirements for data
 integrity on the server's internal state management than the other use-cases.
 
-#### GET /synchronization*?from=9999&limit=9999&session=ff000000*
+#### GET /synchronization*?cursor=9999&limit=9999&state=ff000000*
 
 This endpoint exposes a sync-forward API for linked-data consumers to ingest wholesale the contents
 of an RDF graph that stores docmaps. This is the preferred method of indexing. Note that while the
@@ -383,64 +383,79 @@ head may be per user.
 This endpoint MUST handle parameters supplied as URL Query Parameters, and SHOULD NOT support accepting these
 parameters as fields in the request body.
 
-- from: a sync head. if present, must be number, can be timestamp or preferably a serial. if omitted, start from earliest known.
-Conventionally, element(s) that match `from` are included. Timestamp implementations of `from` may have unspecified behavior
+- cursor: a sync head. if present, must be number, can be timestamp or preferably a serial. if omitted, start from earliest known.
+Conventionally, element(s) that match `cursor` are included. Timestamp implementations of `cursor` may have unspecified behavior
 and are not recommended.
 - limit: a specified maximum number of elements. Because DocMaps data are natively graph based, the semantics of this
-limit are left to implementers and SHOULD NOT be relied upon by clients to produce predictable behavior. A given server
-MAY encourage consumers of the API to use this parameter to intentfully specify their capacity for pagination. A client
-MUST NOT assume that all servers will handle this parameter in the same way.
-- session: OPTIONAL, any string identifier that the server may require for purposes of tracking session-based syncs. The server
-may decide whether this field is required and any further substructure expected within the string that their session cardinality
-may depend on. Note that session identification relates  to client identification  and therefore there are security considerations.
-For example, a server may issue a session token on request for a sync with no `from` specified, as starting a new sync
-session. This session token can be used to disrupt the sync session and so is considered a secret, even though the impact of
+limit are left to implementers and clients SHOULD NOT assume the behavior is consistent between servers.
+- state: OPTIONAL, any string identifier that the server may require for purposes of tracking stateful syncs. The server
+may decide whether this field is required and any further substructure expected within the string that their state cardinality
+may depend on. Note that session identification relates to client identification  and therefore there are security considerations.
+For example, a server may issue a session token on request for a sync with no `cursor` specified, as starting a new sync
+session. This token can be used to disrupt the sync session and so is considered a secret, even though the impact of
 impersonation may not be severe.
 
-**Response** MUST respond with an LD-graph  of objects that may be disjoint. These objects MUST all have
-IRIs in their `ID` field.
+**Response** MUST respond with a changeset log. Each changeset MUST contain an LD-graph of objects that may be disjoint.
+These objects -- named nodes -- MUST all have IRIs in their `ID` field.
 
-Note that this endpoint is asssumed to be dependent on pagination, and MUST conform to LDP Paging (see above).
+Note that this endpoint is to support pagination, and MUST conform to LDP Paging (see above).
 
-The `next` `Link` response header is REQUIRED for this endpoint. If that link refers to a next page which does not yet exist,
+The `Link` response header `next` is REQUIRED for this endpoint. If that link refers to a next page which does not yet exist,
 because the synchronizing client has caught up, it MUST serve `HTTP 202 Accepted` response. Clients are expected to resubmit
 the same query later according to a reasonable back-off scheme.
 
 ```http
-GET https://example.com/docmaps/v1/synchronization?from=9999&limit=9999&session=ff000000
+GET https://example.com/docmaps/v1/synchronization?cursor=9999&limit=9999&state=ff000000
 
 HTTP/1.1 200 OK
 Content-Type:  application/ld+json
-Link: <https://example.com/docmaps/v1/synchronization?from=19998&limit=9999&session=ff000000>; rel="next"
+Link: <https://example.com/docmaps/v1/synchronization?cursor=19998&limit=9999&state=ff000000>; rel="next"
 ```
 
 ```json
 {
-   "@context": "https://w3id.org/docmaps/context.jsonld",
-   "@graph": [
-       {
-         "inputs": [{
-             "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
-         }],
-         "participants": [{
-           "actor": {
-             "type": "person",
-             "name": "John Doe"
-           },
-           "role": "author"
-         }],
-         "id": "https://example.com/docmaps/v1/nn/action/deadbeef",
-       },
-       {
-         "published": "2020-01-01",
-         "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
-         "doi": "10.12345/abcdef",
-         "type": "Article",
-         "content": [{
-           "type": "text",
-           "text": "This is an example of a thing"
-         }]
-       }
+   "transactions": [
+        { 
+            "insert": {
+               "@context": "https://w3id.org/docmaps/context.jsonld",
+               "@graph": [
+                   {
+                     "inputs": [{
+                         "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+                     }],
+                     "participants": [{
+                       "actor": {
+                         "type": "person",
+                         "name": "John Doe"
+                       },
+                       "role": "author"
+                     }],
+                     "id": "https://example.com/docmaps/v1/nn/action/deadbeef",
+                   },
+                   {
+                     "published": "2020-01-01",
+                     "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+                     "doi": "10.12345/abcdef",
+                     "type": "Article",
+                     "content": [{
+                       "type": "text",
+                       "text": "This is an example of a thing"
+                     }]
+                   }
+               ]
+            }
+        },
+        {
+            "delete": {
+               "@context": "https://w3id.org/docmaps/context.jsonld",
+               "@graph": [hi friends, would love any references or recs on ani am designing an OSS API for sharing data between servers controlled by different organizations
+                   {
+                     "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
+                     "type": "Journal-Article",
+                   }
+               ]
+            }
+        }
    ]
 }
 ```
@@ -449,16 +464,24 @@ where
 
 | Field | Value |
 | -------- | -------- |
-| `@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
-| `@graph` | MUST be a json-ld graph. |
+| `transactions` | An ordered array of transations that represent change events in the dataset. |
+| `transactions.[].{verb}` | Must be either `delete` or `insert`. Note that as the transactions are representations of linked data, there is no notion of 'update' supported. |
+| `transactions.[].{verb}.@context` |  If present, MUST be a JSON-LD context. SHOULD be exactly `"https://w3id.org/docmaps/context.jsonld"`  |
+| `transactions.[].{verb}.@graph` | MUST be a json-ld graph. |
 
 By recommendation of the authors, this endpoint SHOULD NOT respond with elements of `"type": "docmap"`, though this is
 allowed. It is generally recommended to respond with persistent objects like Actions, Assertions, and Manifestations.
 
+The transactions SHOULD be consistently reported, but this is not required. However, it is REQUIRED that a client
+who applies all the transactions in the order reported is able to consistently reconstruct a correct RDF dataset.
+
+Note that the contents of the transaction SHOULD be specified as JSON-LD, but other formats and encodings may be supported
+with appropriate `Content-type` headers.
+
 A client MUST NOT assume that the sync is complete because the server did not obey the `limit` parameter. The only
 semantics for a complete synchronization are a `202 Accepted` response, indicating that the sync is up-to-date and
 may continue in the future, or a `204 No Content` or `410 Gone` response, indicating that the sync or session is no longer
-useable and a new one should be started without the `from` parameter.
+useable and a new one should be started with no state.
 
 ## Potential Impact
 
