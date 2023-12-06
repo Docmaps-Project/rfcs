@@ -260,7 +260,7 @@ are owned by the server may be expressed in extensions to this endpoint. See "Se
 
 #### GET /nn/{\*}/{ID}
 
-Any path matching `/nn/\*/{ID}` is allowed and recommended to enable ease-of-use with search and synchronization.
+Any path matching `/nn/{*}/{ID}` is allowed and recommended to enable ease-of-use with search and synchronization.
 Although both `/search` and `/synchronization` allow response graphs that are ultimately lists of docmaps, it is
 recommended that they respond with graphs of all the constituent named nodes, which SHOULD NOT include docmaps.
 The results of such a query SHOULD have an `id` field matching these endpoints.
