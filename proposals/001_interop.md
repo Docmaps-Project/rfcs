@@ -448,8 +448,7 @@ Link: <https://example.com/docmaps/v1/synchronization?cursor=19998&limit=9999&st
         {
             "delete": {
                "@context": "https://w3id.org/docmaps/context.jsonld",
-               "@graph": [hi friends, would love any references or recs on ani am designing an OSS API for sharing data between servers controlled by different organizations
-                   {
+               "@graph": {
                      "id": "https://example.com/docmaps/v1/nn/thing/abcdef",
                      "type": "Journal-Article",
                    }
